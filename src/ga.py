@@ -67,28 +67,37 @@ class Individual_Grid(object):
         # STUDENT implement a mutation operator, also consider not mutating this individual
         # STUDENT also consider weighting the different tile types so it's not uniformly random
         # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
-
         left = 1
         right = width - 1
+
+        mutation_rate = 0.01
         for y in range(height):
             for x in range(left, right):
-                pass
+                # random chance to mutate with a random item from options
+                if random.random() < mutation_rate:
+                    genome[y][x] = random.choice(options)
         return genome
 
     # Create zero or more children from self and other
     def generate_children(self, other):
-        new_genome = copy.deepcopy(self.genome)
+        new_genome1 = copy.deepcopy(self.genome)
+        new_genome2 = copy.deepcopy(other.genome)
         # Leaving first and last columns alone...
         # do crossover with other
         left = 1
         right = width - 1
+        
+        crossover_point = random.randint(1, right)  # Random crossover point
         for y in range(height):
             for x in range(left, right):
                 # STUDENT Which one should you take?  Self, or other?  Why?
                 # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
-                pass
+                new_genome1[y][crossover_point:] = other.genome[y][crossover_point:]
+                new_genome2[y][crossover_point:] = self.genome[y][crossover_point:]
+                
         # do mutation; note we're returning a one-element tuple here
-        return (Individual_Grid(new_genome),)
+        Individual_Grid.mutate(new_genome1, new_genome2)
+        return (Individual_Grid(new_genome1), Individual_Grid(new_genome2))
 
     # Turn the genome into a level string (easy for this genome)
     def to_level(self):
@@ -347,6 +356,12 @@ def generate_successors(population):
     results = []
     # STUDENT Design and implement this
     # Hint: Call generate_children() on some individuals and fill up results.
+    for i in range(0, len(population), 2):
+        if i + 1 < len(population):
+            parent1 = population[i]
+            parent2 = population[i + 1]
+            children = parent1.generate_children(parent2)
+            results.extend(children)
     return results
 
 
