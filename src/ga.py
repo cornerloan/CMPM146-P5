@@ -28,6 +28,24 @@ options = [
 
 # The level as a grid of tiles
 
+#Check if there are blocks that the player can jump on nearby. (may or may not be working properly)
+def checkWithinRange(genome, y, x):
+    left = max(0, x - 4)
+    right = min(len(genome[0])-1, x + 4)
+    up = max(0, y - 3)
+    bot = min(len(genome)-1, y + 3)
+
+    validChoices = {'X', 'B', 'T'}
+    counter = 0
+    for i in range(up, bot):
+        for j in range(left, right):
+            if genome[i][j] in validChoices:
+                counter += 1
+            if genome[i][j] == 'M':
+                return False
+                
+    return 0 < counter < 3
+
 
 class Individual_Grid(object):
     __slots__ = ["genome", "_fitness"]
@@ -45,12 +63,12 @@ class Individual_Grid(object):
         # Default fitness function: Just some arbitrary combination of a few criteria.  Is it good?  Who knows?
         # STUDENT Modify this, and possibly add more metrics.  You can replace this with whatever code you like.
         coefficients = dict(
-            meaningfulJumpVariance=0.5,
-            negativeSpace=0.6,
-            pathPercentage=0.5,
-            emptyPercentage=0.6,
+            meaningfulJumpVariance=2.8,
+            negativeSpace=1.6,
+            pathPercentage=3.5,
+            emptyPercentage=1.9,
             linearity=-0.5,
-            solvability=2.0
+            solvability=1.0
         )
         self._fitness = sum(map(lambda m: coefficients[m] * measurements[m],
                                 coefficients))
@@ -67,16 +85,39 @@ class Individual_Grid(object):
         # STUDENT implement a mutation operator, also consider not mutating this individual
         # STUDENT also consider weighting the different tile types so it's not uniformly random
         # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
+        new_genome1 = copy.deepcopy(self)
+        new_genome2 = copy.deepcopy(genome)
+
         left = 1
         right = width - 1
 
-        mutation_rate = 0.01
-        for y in range(height):
-            for x in range(left, right):
-                # random chance to mutate with a random item from options
-                if random.random() < mutation_rate:
-                    genome[y][x] = random.choice(options)
-        return genome
+        mutation_rate = 0.1
+        for genome_i in [new_genome1, new_genome2]:
+            for y in range(height-1):
+                for x in range(left, right):
+                    # random chance to mutate with a random item from options
+                    if random.random() < mutation_rate:
+                        if genome_i[y][x] == '|' and (genome[y-1][x] == 'T' or genome[y-1][x] == '|'): continue
+                        if y == 15: 
+                            genome_i[y][x] = 'X'
+                            continue
+                        choice = random.choice(options)
+                        if checkWithinRange(genome_i,y,x):
+                            if choice == 'T':                   #If its a pipe
+                                double = random.random() > .5   #50% chance it's a thick pipe
+                                if double: genome_i[y][x-1] = 'T'
+                                for i in range(y+1,height-1):     #Make the pipe connect with the ground.
+                                    genome_i[i][x] = '|'
+                                    if double: genome[i][x-1] = '|'
+
+                            elif choice == '|': choice = '-'           #Dont spawn random pipes
+                            elif choice == 'B': genome_i[y][x-1] = 'B'      #If its a breakable brick, spawn one to the left too
+                            genome_i[y][x] = choice
+
+
+                        else: genome_i[y][x] = '-'
+                        
+        return new_genome1, new_genome2
 
     # Create zero or more children from self and other
     def generate_children(self, other):
@@ -85,18 +126,18 @@ class Individual_Grid(object):
         # Leaving first and last columns alone...
         # do crossover with other
         left = 1
-        right = width - 1
+        right = len(new_genome1[0]) - 1
         
-        crossover_point = random.randint(1, right)  # Random crossover point
-        for y in range(height):
-            for x in range(left, right):
+        for y in range(len(new_genome1)):   
+            crossover_point = random.randint(left, right - 1)  # Random crossover point
+            for x in range(crossover_point, right):
                 # STUDENT Which one should you take?  Self, or other?  Why?
                 # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
-                new_genome1[y][crossover_point:] = other.genome[y][crossover_point:]
-                new_genome2[y][crossover_point:] = self.genome[y][crossover_point:]
+                new_genome1[y][x] = other.genome[y][x]
+                new_genome2[y][x] = self.genome[y][x]
                 
         # do mutation; note we're returning a one-element tuple here
-        Individual_Grid.mutate(new_genome1, new_genome2)
+        new_genome1,new_genome2 = Individual_Grid.mutate(new_genome1, new_genome2)
         return (Individual_Grid(new_genome1), Individual_Grid(new_genome2))
 
     # Turn the genome into a level string (easy for this genome)
@@ -399,7 +440,7 @@ def ga():
                     print("Max fitness:", str(best.fitness()))
                     print("Average generation time:", (now - start) / generation)
                     print("Net time:", now - start)
-                    with open("levels/last.txt", 'w') as f:
+                    with open("src/levels/last.txt", 'w') as f:
                         for row in best.to_level():
                             f.write("".join(row) + "\n")
                 generation += 1
@@ -431,6 +472,6 @@ if __name__ == "__main__":
     now = time.strftime("%m_%d_%H_%M_%S")
     # STUDENT You can change this if you want to blast out the whole generation, or ten random samples, or...
     for k in range(0, 10):
-        with open("levels/" + now + "_" + str(k) + ".txt", 'w') as f:
+        with open("src/levels/" + now + "_" + str(k) + ".txt", 'w') as f:
             for row in final_gen[k].to_level():
                 f.write("".join(row) + "\n")
