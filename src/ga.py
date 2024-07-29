@@ -163,10 +163,15 @@ class Individual_Grid(object):
         # STUDENT consider putting more constraints on this to prevent pipes in the air, etc
         # STUDENT also consider weighting the different tile types so it's not uniformly random
         g = [random.choices(options, k=width) for row in range(height)]
+        for row in g:
+            row[0] = "-"
+            row[-1] = "-"
         g[15][:] = ["X"] * width
         g[14][0] = "m"
         g[7][-1] = "v"
-        g[8:14][-1] = ["f"] * 6
+        for col in range(8, 14):
+            g[col][-1] = "f"
+        g[14][-1] = "X"
         g[14:16][-1] = ["X", "X"]
         return cls(g)
 
@@ -429,9 +434,13 @@ def ga():
         generation = 0
         start = time.time()
         now = start
-        print("Use ctrl-c to terminate this loop manually.")
+        print("Use ctrl-c to terminate this loop manually. Also ends after 10 iterations for testing purposes.")
+        count = 0
         try:
             while True:
+                #end after 10 iterations
+                count += 1
+                if count > 10: break
                 now = time.time()
                 # Print out statistics
                 if generation > 0:
