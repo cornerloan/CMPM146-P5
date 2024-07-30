@@ -35,7 +35,7 @@ def checkWithinRange(genome, y, x):
     up = max(0, y - 3)
     bot = min(len(genome)-1, y + 3)
 
-    validChoices = {'X', 'B', 'T'}
+    validChoices = {'X', '?', 'M', 'T'}
     counter = 0
     for i in range(up, bot):
         for j in range(left, right):
@@ -88,34 +88,44 @@ class Individual_Grid(object):
         new_genome1 = copy.deepcopy(self)
         new_genome2 = copy.deepcopy(genome)
 
-        left = 1
+        left = 2
         right = width - 1
 
-        mutation_rate = 0.1
+        mutation_rate = 0.1 # 10% chance for a mutation to occur
         for genome_i in [new_genome1, new_genome2]:
             for y in range(height-1):
-                for x in range(left, right):
+                for x in range(left, right):   
+                    if genome_i[y][x] == '|' and (genome[y-1][x] == 'T' or genome[y-1][x] == '|'): continue # valid pipe, skip this iteration
+                    if y == 15:     #fill bottom of screen with
+                        genome_i[y][x] = 'X'
+                        continue
+                    double = random.random() > .5   #50% chance it's a thick pipe
                     # random chance to mutate with a random item from options
                     if random.random() < mutation_rate:
-                        if genome_i[y][x] == '|' and (genome[y-1][x] == 'T' or genome[y-1][x] == '|'): continue
-                        if y == 15: 
-                            genome_i[y][x] = 'X'
-                            continue
                         choice = random.choice(options)
                         if checkWithinRange(genome_i,y,x):
-                            if choice == 'T':                   #If its a pipe
-                                double = random.random() > .5   #50% chance it's a thick pipe
-                                if double: genome_i[y][x-1] = 'T'
+                            if choice == 'T' or genome_i[y][x] == 'T':       #If its a pipe
+                                if double: genome_i[y][x-1] = 'T'     #only do double pipe rule if it won't affect left boundary
                                 for i in range(y+1,height-1):     #Make the pipe connect with the ground.
                                     genome_i[i][x] = '|'
                                     if double: genome[i][x-1] = '|'
 
                             elif choice == '|': choice = '-'           #Dont spawn random pipes
-                            elif choice == 'B': genome_i[y][x-1] = 'B'      #If its a breakable brick, spawn one to the left too
-                            genome_i[y][x] = choice
-
-
+                            elif choice == 'B': genome_i[y][x-1] = 'B'      #If its a breakable brick, spawn one to the left too, unless it spawns on left boundary
+                            elif choice == 'E' and x < 5: genome_i[y][x] = '-'      #Dont spawn enemies too close to the spawn
+                            else: genome_i[y][x] = choice
                         else: genome_i[y][x] = '-'
+            
+            #after initial placing, ensure pipes connect with ground
+            for x in range(left, right):
+                for y in range(height-1):
+                    if (genome_i[y][x] == 'T' or genome_i[y][x] == '|') and (y < 5 or x < 5 or x > width-5): genome_i[y][x] = '-'
+                    elif genome_i[y][x] == 'T':
+                        for row in range(y+1, 15):
+                            genome_i[row][x] = '|'
+                        break
+                    elif genome_i[y][x] == '|': genome_i[y][x] = '-'
+                    
                         
         return new_genome1, new_genome2
 
@@ -173,6 +183,10 @@ class Individual_Grid(object):
             g[col][-1] = "f"
         g[14][-1] = "X"
         g[14:16][-1] = ["X", "X"]
+        for y in range(height):
+            for x in range(width):
+                if g[y][x] == 'T' or g[y][x] == '|': g[y][x] = '-'
+
         return cls(g)
 
 
