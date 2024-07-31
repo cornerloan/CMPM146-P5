@@ -26,25 +26,37 @@ options = [
     #"m"  # mario's start position, do not generate
 ]
 
+weighed_options = [
+    'X',    #~8% chance of wall
+    'B','B','B','B','B',        #~60% chance of breakable block
+    '?','?',            #~20% chance for coin block
+    'M',                 #low chance for mushroom
+    'T','T','T'             #low chance for pipe
+]
+
+utilities_options = [
+    'o','o','o',
+    'E','E',
+    '-'
+]
+
 # The level as a grid of tiles
 
 #Check if there are blocks that the player can jump on nearby. (may or may not be working properly)
 def checkWithinRange(genome, y, x):
-    left = max(0, x - 4)
-    right = min(len(genome[0])-1, x + 4)
-    up = max(0, y - 3)
-    bot = min(len(genome)-1, y + 3)
+    left = max(0, x - 5)
+    right = min(width-1, x + 5)
+    up = max(0, y - 2)
+    bot = min(height-1, y + 3)
 
-    validChoices = {'X', '?', 'M', 'T'}
+    validChoices = {'X', '?', 'M', 'T','B'}
     counter = 0
     for i in range(up, bot):
         for j in range(left, right):
             if genome[i][j] in validChoices:
                 counter += 1
-            if genome[i][j] == 'M':
-                return False
                 
-    return 0 < counter < 3
+    return (0 < counter < 3)
 
 
 class Individual_Grid(object):
@@ -63,12 +75,12 @@ class Individual_Grid(object):
         # Default fitness function: Just some arbitrary combination of a few criteria.  Is it good?  Who knows?
         # STUDENT Modify this, and possibly add more metrics.  You can replace this with whatever code you like.
         coefficients = dict(
-            meaningfulJumpVariance=2.8,
-            negativeSpace=1.6,
-            pathPercentage=3.5,
-            emptyPercentage=1.9,
-            linearity=-0.5,
-            solvability=1.0
+            meaningfulJumpVariance=1.3,
+            negativeSpace=0.8,
+            pathPercentage=2.5,
+            emptyPercentage=1.0,
+            linearity=0.5,
+            solvability=3.0
         )
         self._fitness = sum(map(lambda m: coefficients[m] * measurements[m],
                                 coefficients))
@@ -88,33 +100,58 @@ class Individual_Grid(object):
         new_genome1 = copy.deepcopy(self)
         new_genome2 = copy.deepcopy(genome)
 
-        left = 2
+        left = 1
         right = width - 1
 
         mutation_rate = 0.1 # 10% chance for a mutation to occur
         for genome_i in [new_genome1, new_genome2]:
             for y in range(height-1):
                 for x in range(left, right):   
-                    if genome_i[y][x] == '|' and (genome[y-1][x] == 'T' or genome[y-1][x] == '|'): continue # valid pipe, skip this iteration
+                    #Pre Checks. Things we should check before we do a normal mutation.
+                    
+                    if (genome_i[y][x-1] != '-' and random.random() > .5): continue #If there is an object before, 50% chance to skip. Adjust in future.
+                    if genome_i[y][x] == '|' and (genome_i[y-1][x] == 'T' or genome_i[y-1][x] == '|'): continue # valid pipe, skip this iteration
+                    if genome_i[y][x] == 'f' or genome_i[y][x] == 'v' or genome_i[y][x] == 'm': continue #Skip flag post and mario spawn point in generation.
+                    if y < 3: 
+                        if random.random() < 0.05:
+                            genome_i[y][x] = 'o'
+                        elif random.random() < 0.001:
+                            genome_i[y][x] = 'X'
+                        else: genome_i[y][x] = '-'
+                        continue
+                    if genome_i[y][x-1] == 'm': 
+                        genome_i[y][x] == '-'
+                        continue
                     if y == 15:     #fill bottom of screen with
                         genome_i[y][x] = 'X'
                         continue
+                    
+
+                    #Makeshift Pyramid Code, improved below
+                    #if y > 10 and (genome_i[y-1][x+1] == 'X' or genome_i[y-1][x] == 'X'): #If the block above or  up and to the right is X
+                        #genome_i[y][x] == 'X' #Set this one to X. This should make a pyramid shape.
+                        #if x < width - 1: genome_i[y][x+1] == 'X' #and the next one.
+                    
+
                     double = random.random() > .5   #50% chance it's a thick pipe
                     # random chance to mutate with a random item from options
                     if random.random() < mutation_rate:
-                        choice = random.choice(options)
+                        choice = random.choice(weighed_options)
                         if checkWithinRange(genome_i,y,x):
                             if choice == 'T' or genome_i[y][x] == 'T':       #If its a pipe
-                                if double: genome_i[y][x-1] = 'T'     #only do double pipe rule if it won't affect left boundary
+                                if double and x > 0: genome_i[y][x-1] = 'T'     #only do double pipe rule if it won't affect left boundary
                                 for i in range(y+1,height-1):     #Make the pipe connect with the ground.
+                                    if genome_i[i][x] == 'X': break #Stop Pipe, like below.
                                     genome_i[i][x] = '|'
-                                    if double: genome[i][x-1] = '|'
-
-                            elif choice == '|': choice = '-'           #Dont spawn random pipes
-                            elif choice == 'B': genome_i[y][x-1] = 'B'      #If its a breakable brick, spawn one to the left too, unless it spawns on left boundary
-                            elif choice == 'E' and x < 5: genome_i[y][x] = '-'      #Dont spawn enemies too close to the spawn
+                                    if double and x > 0: genome_i[i][x-1] = '|'
+                            elif choice == 'B': 
+                                genome_i[y][x] = choice
+                                if x > 0: genome_i[y][x-1] = choice      #If its a breakable brick, spawn one to the left too, unless it spawns on left boundary
                             else: genome_i[y][x] = choice
-                        else: genome_i[y][x] = '-'
+                        elif genome_i[y+1][x] != '-' and random.random() < 0.2:
+                            genome_i[y][x] = random.choice(utilities_options)
+                        else: 
+                            genome_i[y][x] = '-'
             
             #after initial placing, ensure pipes connect with ground
             for x in range(left, right):
@@ -122,8 +159,13 @@ class Individual_Grid(object):
                     if (genome_i[y][x] == 'T' or genome_i[y][x] == '|') and (y < 5 or x < 5 or x > width-5): genome_i[y][x] = '-'
                     elif genome_i[y][x] == 'T':
                         for row in range(y+1, 15):
+                            if genome_i[row][x] == 'X': break #Stop the pipe if it hits an unbreakable block.
                             genome_i[row][x] = '|'
                         break
+                    if genome_i[y][x] == 'X' and 14 > y > 10 and width - 4 > x > 6:
+                        if x > 2: genome_i[y+1][x-1] = 'X'
+                        genome_i[y+1][x] = 'X'
+                        if x < width-2: genome_i[y+1][x+1] = 'X'
                     elif genome_i[y][x] == '|': genome_i[y][x] = '-'
                     
                         
@@ -436,7 +478,7 @@ def ga():
     with mpool.Pool(processes=os.cpu_count()) as pool:
         init_time = time.time()
         # STUDENT (Optional) change population initialization
-        population = [Individual.random_individual() if random.random() < 0.9
+        population = [Individual.random_individual() if random.random() < 0.01
                       else Individual.empty_individual()
                       for _g in range(pop_limit)]
         # But leave this line alone; we have to reassign to population because we get a new population that has more cached stuff in it.
