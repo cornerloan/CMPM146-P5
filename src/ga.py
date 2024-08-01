@@ -75,12 +75,12 @@ class Individual_Grid(object):
         # Default fitness function: Just some arbitrary combination of a few criteria.  Is it good?  Who knows?
         # STUDENT Modify this, and possibly add more metrics.  You can replace this with whatever code you like.
         coefficients = dict(
-            meaningfulJumpVariance=1.3,
+            meaningfulJumpVariance=0.3,
             negativeSpace=0.8,
             pathPercentage=2.5,
             emptyPercentage=1.0,
-            linearity=0.5,
-            solvability=3.0
+            linearity=0.8,
+            solvability=1.0
         )
         self._fitness = sum(map(lambda m: coefficients[m] * measurements[m],
                                 coefficients))
@@ -109,11 +109,10 @@ class Individual_Grid(object):
                 for x in range(left, right):   
                     #Pre Checks. Things we should check before we do a normal mutation.
                     
-                    if (genome_i[y][x-1] != '-' and random.random() > .5): continue #If there is an object before, 50% chance to skip. Adjust in future.
                     if genome_i[y][x] == '|' and (genome_i[y-1][x] == 'T' or genome_i[y-1][x] == '|'): continue # valid pipe, skip this iteration
                     if genome_i[y][x] == 'f' or genome_i[y][x] == 'v' or genome_i[y][x] == 'm': continue #Skip flag post and mario spawn point in generation.
                     if y < 3: 
-                        if random.random() < 0.05:
+                        if random.random() < 0.05 and checkWithinRange(genome_i,y,x):
                             genome_i[y][x] = 'o'
                         elif random.random() < 0.001:
                             genome_i[y][x] = 'X'
@@ -126,7 +125,7 @@ class Individual_Grid(object):
                         genome_i[y][x] = 'X'
                         continue
                     
-
+                    if (genome_i[y][x-1] != '-' and random.random() > .5): continue #If there is an object before, 50% chance to skip. Adjust in future.
                     #Makeshift Pyramid Code, improved below
                     #if y > 10 and (genome_i[y-1][x+1] == 'X' or genome_i[y-1][x] == 'X'): #If the block above or  up and to the right is X
                         #genome_i[y][x] == 'X' #Set this one to X. This should make a pyramid shape.
@@ -146,7 +145,10 @@ class Individual_Grid(object):
                                     if double and x > 0: genome_i[i][x-1] = '|'
                             elif choice == 'B': 
                                 genome_i[y][x] = choice
-                                if x > 0: genome_i[y][x-1] = choice      #If its a breakable brick, spawn one to the left too, unless it spawns on left boundary
+                                tempLength = random.randint(0,6)
+                                if x > tempLength: 
+                                    for num in range(0,tempLength):
+                                        genome_i[y][x-num] = choice      #If its a breakable brick, spawn one to the left too, unless it spawns on left boundary
                             else: genome_i[y][x] = choice
                         elif genome_i[y+1][x] != '-' and random.random() < 0.2:
                             genome_i[y][x] = random.choice(utilities_options)
@@ -490,13 +492,13 @@ def ga():
         generation = 0
         start = time.time()
         now = start
-        print("Use ctrl-c to terminate this loop manually. Also ends after 10 iterations for testing purposes.")
+        print("Use ctrl-c to terminate this loop manually. Also ends after 25 iterations for testing purposes.")
         count = 0
         try:
             while True:
                 #end after 10 iterations
                 count += 1
-                if count > 10: break
+                if count > 25: break
                 now = time.time()
                 # Print out statistics
                 if generation > 0:
@@ -536,7 +538,7 @@ if __name__ == "__main__":
     print("Best fitness: " + str(best.fitness()))
     now = time.strftime("%m_%d_%H_%M_%S")
     # STUDENT You can change this if you want to blast out the whole generation, or ten random samples, or...
-    for k in range(0, 10):
+    for k in range(0, 25):
         with open("src/levels/" + now + "_" + str(k) + ".txt", 'w') as f:
             for row in final_gen[k].to_level():
                 f.write("".join(row) + "\n")
